@@ -28,6 +28,8 @@ jobs:
           SWITCHVK_JOBS: 4
         run: |
           set -euo pipefail
+          exec > >(tee "$GITHUB_WORKSPACE/.switchvk-build-release.log") 2>&1
+          set -x
           mkdir -p .switchvk-tmp/spirv-tools-prefix
           docker run --rm \
             -v "$GITHUB_WORKSPACE/nxvk-source:/work" \
@@ -39,13 +41,15 @@ jobs:
             -e NXVK_SOURCE_DIR=/work \
             -e SPIRV_PREFIX=/work/spirv-tools-prefix \
             switchvk-build \
-            bash /sdk/ci/build-sdk-in-container.sh
+            bash -x /sdk/ci/build-sdk-in-container.sh
 
       - name: Package diagnostic SDK and archive both variants
         env:
           SWITCHVK_JOBS: 4
         run: |
           set -euo pipefail
+          exec > >(tee "$GITHUB_WORKSPACE/.switchvk-package.log") 2>&1
+          set -x
           docker run --rm \
             -v "$GITHUB_WORKSPACE/nxvk-source:/work" \
             -v "$GITHUB_WORKSPACE:/sdk" \
@@ -55,7 +59,7 @@ jobs:
             -e NXVK_SOURCE_DIR=/work \
             -e SPIRV_PREFIX=/work/spirv-tools-prefix \
             switchvk-build \
-            bash -lc 'bash package_sdk.sh --source /work --build /work/switch/build/cross --output /sdk/nvk-switch-26.1.4-diagnostic --version 26.1.4 --variant diagnostic && bash verify_sdk.sh /sdk/nvk-switch-26.1.4-diagnostic'
+            bash -lc 'bash -x package_sdk.sh --source /work --build /work/switch/build/cross --output /sdk/nvk-switch-26.1.4-diagnostic --version 26.1.4 --variant diagnostic && bash -x verify_sdk.sh /sdk/nvk-switch-26.1.4-diagnostic'
           tar -cJf switchVK-26.1.4.tar.xz nvk-switch-26.1.4
           tar -cJf switchVK-26.1.4-diagnostic.tar.xz nvk-switch-26.1.4-diagnostic
           sha256sum switchVK-26.1.4.tar.xz > switchVK-26.1.4.tar.xz.sha256
@@ -72,6 +76,17 @@ jobs:
             switchVK-26.1.4-diagnostic.tar.xz.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload SDK diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: switchVK-build-diagnostics-${{ github.run_id }}
+          path: |
+            .switchvk-build-release.log
+            .switchvk-package.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Publish SDK Release
         if: startsWith(github.ref, 'refs/tags/v')
