@@ -32,12 +32,12 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE/nxvk-source:/work" \
             -v "$GITHUB_WORKSPACE:/sdk" \
-            -v "$GITHUB_WORKSPACE/.switchvk-tmp/spirv-tools-prefix:/spirv-tools-prefix" \
+            -v "$GITHUB_WORKSPACE/.switchvk-tmp/spirv-tools-prefix:/work/spirv-tools-prefix" \
             -w /sdk \
             -e SWITCHVK_JOBS \
             -e DEVKITPRO=/opt/devkitpro \
             -e NXVK_SOURCE_DIR=/work \
-            -e SPIRV_PREFIX=/spirv-tools-prefix \
+            -e SPIRV_PREFIX=/work/spirv-tools-prefix \
             switchvk-build \
             bash /sdk/ci/build-sdk-in-container.sh
 
@@ -49,11 +49,11 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE/nxvk-source:/work" \
             -v "$GITHUB_WORKSPACE:/sdk" \
-            -v "$GITHUB_WORKSPACE/.switchvk-tmp/spirv-tools-prefix:/spirv-tools-prefix" \
+            -v "$GITHUB_WORKSPACE/.switchvk-tmp/spirv-tools-prefix:/work/spirv-tools-prefix" \
             -w /sdk \
             -e DEVKITPRO=/opt/devkitpro \
             -e NXVK_SOURCE_DIR=/work \
-            -e SPIRV_PREFIX=/spirv-tools-prefix \
+            -e SPIRV_PREFIX=/work/spirv-tools-prefix \
             switchvk-build \
             bash -lc 'bash package_sdk.sh --source /work --build /work/switch/build/cross --output /sdk/nvk-switch-26.1.4-diagnostic --version 26.1.4 --variant diagnostic && bash verify_sdk.sh /sdk/nvk-switch-26.1.4-diagnostic'
           tar -cJf switchVK-26.1.4.tar.xz nvk-switch-26.1.4
