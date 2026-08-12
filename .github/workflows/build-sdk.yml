@@ -11,7 +11,10 @@ permissions:
 
 jobs:
   build-sdk:
-    runs-on: ubuntu-latest
+    # NXVK's devkita64 image and the generated SDK are aarch64.  Use the
+    # public GitHub ARM64 runner so Docker does not try to execute an ARM
+    # toolchain through an unavailable x86 emulator.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
     steps:
       - name: Check out switchVK and NXVK
