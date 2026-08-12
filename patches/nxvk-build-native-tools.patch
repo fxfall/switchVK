@@ -1,0 +1,12 @@
+diff --git a/switch/build/build-native-tools.sh b/switch/build/build-native-tools.sh
+index 86d5162..529127b 100755
+--- a/switch/build/build-native-tools.sh
++++ b/switch/build/build-native-tools.sh
+@@ -26,6 +26,7 @@ meson setup $RECONF "$BUILD" "$SRC" \
+   -Dprecomp-compiler=auto \
+   -Dllvm=enabled \
+   -Dshared-llvm=enabled \
++  -Dmesa-clc-bundle-headers=enabled \
+   -Dvulkan-drivers= \
+   -Dgallium-drivers= \
+   -Dplatforms= \

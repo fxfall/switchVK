@@ -1,0 +1,12 @@
+nxvk-source/switch/build/
+nxvk-source/switch/smoke/out/
+nxvk-source/switch/rust/sysroot/
+nxvk-source/spirv-tools-prefix/
+nvk-switch-*/
+.switchvk-tmp/
+.DS_Store
+spirv-headers-src/
+spirv-tools-src/
+spirv-tools-build/
+spirv-tools-prefix/
+*.log

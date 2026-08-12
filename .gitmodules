@@ -1,0 +1,4 @@
+[submodule "nxvk-source"]
+	path = nxvk-source
+	url = https://github.com/beiklive/nxvk.git
+	branch = switch

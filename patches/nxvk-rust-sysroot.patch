@@ -1,0 +1,24 @@
+diff --git a/switch/rust/build-std-sysroot.sh b/switch/rust/build-std-sysroot.sh
+index b8b3423..8c29d5f 100755
+--- a/switch/rust/build-std-sysroot.sh
++++ b/switch/rust/build-std-sysroot.sh
+@@ -22,11 +22,16 @@ printf '[package]\nname="stdsr"\nversion="0.0.0"\nedition="2021"\n[lib]\ncrate-t
+ cargo +nightly build --release -Zbuild-std=core,alloc,std,panic_abort --target "$TGT"
+ 
+ # Assemble the sysroot
+-DEPS=/tmp/stdsr/target/$TGT/release/deps
++DEPS=/tmp/stdsr/target/$TGT/release
+ rm -rf "$SYSROOT"
+ mkdir -p "$SYSROOT/lib/rustlib/$TGT/lib"
+-cp -f "$DEPS"/*.rlib  "$SYSROOT/lib/rustlib/$TGT/lib/" 2>/dev/null || true
+-cp -f "$DEPS"/*.rmeta "$SYSROOT/lib/rustlib/$TGT/lib/" 2>/dev/null || true
++# Recent Cargo puts build-std artifacts below each package's build/*/out
++# directory instead of directly in release/deps.  Collect both layouts so
++# the generated target sysroot remains usable across nightly toolchains.
++find "$DEPS" -path '*/out/*.rlib' -exec cp -f {} "$SYSROOT/lib/rustlib/$TGT/lib/" \;
++find "$DEPS" -path '*/out/*.rmeta' -exec cp -f {} "$SYSROOT/lib/rustlib/$TGT/lib/" \;
++cp -f "$DEPS/deps"/*.rlib  "$SYSROOT/lib/rustlib/$TGT/lib/" 2>/dev/null || true
++cp -f "$DEPS/deps"/*.rmeta "$SYSROOT/lib/rustlib/$TGT/lib/" 2>/dev/null || true
+ for d in "$RUSTC_SYSROOT/lib/rustlib"/*; do
+   b=$(basename "$d")
+   [ "$b" = "$TGT" ] && continue
