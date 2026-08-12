@@ -1,0 +1,112 @@
+name: Build switchVK SDK (QEMU fallback)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v0.1.8'
+
+permissions:
+  contents: write
+
+jobs:
+  build-sdk:
+    # Keep a non-ARM fallback for periods where public ARM runners are queued.
+    # The devkita64 image and toolchain remain ARM64; QEMU only emulates the
+    # build container and all generated libraries retain the Switch ABI.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Check out switchVK and NXVK
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Enable ARM64 container emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build and package SDK in devkita64 container
+        shell: bash
+        env:
+          SWITCHVK_JOBS: 4
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/arm64 \
+            -e GITHUB_WORKSPACE=/workspace \
+            -e SWITCHVK_JOBS="$SWITCHVK_JOBS" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            devkitpro/devkita64:latest \
+            bash -lc '
+              set -euo pipefail
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                python3-pip bison flex curl ca-certificates pkg-config git \
+                build-essential cmake ninja-build llvm-15-dev clang-15 libclang-15-dev \
+                libclc-15-dev libclc-15 llvm-spirv-15 libllvmspirvlib-15-dev \
+                spirv-tools libdrm-dev glslang-tools
+              python3 -m pip install --break-system-packages --no-cache-dir \
+                "meson>=1.4" mako pyyaml
+              export RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo
+              export PATH="/opt/rust/cargo/bin:$PATH"
+              export RUSTUP_HOME CARGO_HOME PATH
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | \
+                sh -s -- -y --default-toolchain nightly --profile minimal --component rust-src
+              rustup component add rustfmt
+              cargo install --locked bindgen-cli cbindgen
+              mkdir -p /opt/switch-cross-include/libdrm
+              cp /usr/include/xf86drm.h /usr/include/xf86drmMode.h \
+                /opt/switch-cross-include/ 2>/dev/null || true
+              cp -r /usr/include/libdrm/* /opt/switch-cross-include/ 2>/dev/null || true
+              cp -r /usr/include/libdrm/* /opt/switch-cross-include/libdrm/ 2>/dev/null || true
+              cp -R nxvk-source/switch/docker/cross-include/. /opt/switch-cross-include/
+              xdir=/opt/devkitpro/portlibs/switch/lib/pkgconfig
+              mkdir -p "$xdir"
+              for name in libclc LLVMSPIRVLib SPIRV-Tools SPIRV-Tools-shared SPIRV-Headers; do
+                f=$(find /usr -name "$name.pc" 2>/dev/null | head -1)
+                if [ -n "$f" ]; then cp "$f" "$xdir/"; fi
+              done
+              /opt/devkitpro/devkitA64/bin/aarch64-none-elf-ar rcs \
+                /opt/devkitpro/portlibs/switch/lib/libdl.a
+              mkdir -p .switchvk-tmp/spirv-tools-prefix
+              export DEVKITPRO=/opt/devkitpro NXVK_SOURCE_DIR=/workspace/nxvk-source
+              export SPIRV_PREFIX=/workspace/.switchvk-tmp/spirv-tools-prefix
+              bash -x ci/build-sdk-in-container.sh
+              bash -x package_sdk.sh --source /workspace/nxvk-source \
+                --build /workspace/nxvk-source/switch/build/cross \
+                --output /workspace/nvk-switch-26.1.4-diagnostic \
+                --version 26.1.4 --variant diagnostic
+              bash -x verify_sdk.sh /workspace/nvk-switch-26.1.4-diagnostic
+              tar -cJf switchVK-26.1.4.tar.xz nvk-switch-26.1.4
+              tar -cJf switchVK-26.1.4-diagnostic.tar.xz nvk-switch-26.1.4-diagnostic
+              sha256sum switchVK-26.1.4.tar.xz > switchVK-26.1.4.tar.xz.sha256
+              sha256sum switchVK-26.1.4-diagnostic.tar.xz > switchVK-26.1.4-diagnostic.tar.xz.sha256
+            '
+
+      - name: Upload SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: switchVK-${{ github.sha }}
+          path: |
+            switchVK-26.1.4.tar.xz
+            switchVK-26.1.4.tar.xz.sha256
+            switchVK-26.1.4-diagnostic.tar.xz
+            switchVK-26.1.4-diagnostic.tar.xz.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish SDK Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            switchVK-26.1.4.tar.xz
+            switchVK-26.1.4.tar.xz.sha256
+            switchVK-26.1.4-diagnostic.tar.xz
+            switchVK-26.1.4-diagnostic.tar.xz.sha256
