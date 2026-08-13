@@ -1,13 +1,50 @@
+diff --git a/switch/build/configure-mesa.sh b/switch/build/configure-mesa.sh
+index bd24665..269342d 100755
+--- a/switch/build/configure-mesa.sh
++++ b/switch/build/configure-mesa.sh
+@@ -23,9 +23,17 @@ cp -r "$SRC/switch/docker/cross-include/." /opt/switch-cross-include/ 2>/dev/null || true
+ RECONF=""
+ [ -f "$BUILD/build.ninja" ] && RECONF="--wipe"
+ 
++# The upstream Rust cross file historically used /work. Generate a build-local
++# copy with the wrapper resolved from the actual source directory.
++RUST_CROSS_FILE="$BUILD/rust.cross"
++awk -v rust_wrapper="$SRC/switch/rust/rustc-switch.sh" '
++  $0 ~ /^rust[[:space:]]*=/ { print "rust    = [" sq rust_wrapper sq "]"; next }
++  { print }
++' sq="'" "$SRC/switch/crossfiles/rust.cross" > "$RUST_CROSS_FILE"
++
+ meson setup $RECONF "$BUILD" "$SRC" \
+   --cross-file "$SRC/switch/crossfiles/switch.cross" \
+-  --cross-file "$SRC/switch/crossfiles/rust.cross" \
++  --cross-file "$RUST_CROSS_FILE" \
+   --native-file "$SRC/switch/crossfiles/native.txt" \
+   --buildtype release \
+   -Dmesa-clc=system \
+diff --git a/switch/crossfiles/rust.cross b/switch/crossfiles/rust.cross
+index 9176c59..91e878b 100644
+--- a/switch/crossfiles/rust.cross
++++ b/switch/crossfiles/rust.cross
+@@ -4,7 +4,7 @@
+ # Meson CROSS file for the Rust half of the build (NVK's NAK compiler + bindgen).
+ 
+ [binaries]
+-rust    = ['/work/switch/rust/rustc-switch.sh']
++rust    = ['rustc-switch.sh']
+ bindgen = 'bindgen'
+ 
+ [properties]
 diff --git a/switch/rust/build-std-sysroot.sh b/switch/rust/build-std-sysroot.sh
+index b8b3423..9114c59 100755
 --- a/switch/rust/build-std-sysroot.sh
 +++ b/switch/rust/build-std-sysroot.sh
-@@ -8,8 +8,11 @@
+@@ -9,10 +9,13 @@
  #       bash switch/rust/build-std-sysroot.sh
  set -e
  
 -export RUST_TARGET_PATH=/work/switch/rust RUSTC_BOOTSTRAP=1
 +# The source tree may be mounted at /work, a GitHub workspace, or another
-+# path.  Resolve it from this script instead of assuming the old /work mount.
++# path. Resolve it from this script instead of assuming the old /work mount.
 +NXVK_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 +export RUST_TARGET_PATH="$NXVK_ROOT/switch/rust" RUSTC_BOOTSTRAP=1
  export RUSTFLAGS='-Zunstable-options -L /opt/devkitpro/devkitA64/aarch64-none-elf/lib -L /opt/devkitpro/libnx/lib'
@@ -15,3 +52,29 @@ diff --git a/switch/rust/build-std-sysroot.sh b/switch/rust/build-std-sysroot.sh
 -SYSROOT=/work/switch/rust/sysroot
 +SYSROOT="$NXVK_ROOT/switch/rust/sysroot"
  RUSTC_SYSROOT="$(rustc --print sysroot)"
+ 
+ # build-std (release) on a throwaway lib crate
+diff --git a/switch/rust/rustc-switch.sh b/switch/rust/rustc-switch.sh
+index ff8614d..d77aeac 100755
+--- a/switch/rust/rustc-switch.sh
++++ b/switch/rust/rustc-switch.sh
+@@ -4,7 +4,8 @@
+ #
+ # rustc wrapper that meson invokes to compile NAK.
+ export RUSTC_BOOTSTRAP=1
+-export RUST_TARGET_PATH=/work/switch/rust
++NXVK_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
++export RUST_TARGET_PATH="$NXVK_ROOT/switch/rust"
+ 
+ final=()
+ all=("$@")
+@@ -20,7 +20,7 @@ while [ $i -lt $n ]; do
+ done
+ 
+ exec rustc -Zunstable-options \
+-  --sysroot /work/switch/rust/sysroot \
++  --sysroot "$NXVK_ROOT/switch/rust/sysroot" \
+   --target aarch64-switch-horizon \
+   -L /opt/devkitpro/devkitA64/aarch64-none-elf/lib \
+   -L /opt/devkitpro/libnx/lib \
+   "${final[@]}"

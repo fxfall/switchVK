@@ -49,7 +49,10 @@ if ((REBUILD)); then
     rm -rf "$BUILD_DIR" "$NATIVE_DIR"
 fi
 
-export PATH="$DEVKITPRO/devkitA64/bin:$DEVKITPRO/tools/bin:$NATIVE_DIR/bin:$PATH"
+# Meson's Rust cross file refers to the wrapper by name. Keep the wrapper
+# beside the checked-out NXVK tree on PATH so the build works regardless of
+# whether the source is mounted at /work, /workspace, or another path.
+export PATH="$SOURCE_DIR/switch/rust:$DEVKITPRO/devkitA64/bin:$DEVKITPRO/tools/bin:$NATIVE_DIR/bin:$PATH"
 export NXVK_SOURCE_DIR="$SOURCE_DIR"
 
 bash "$ROOT/ci/apply-nxvk-patches.sh" "$SOURCE_DIR"
