@@ -2,16 +2,15 @@ diff --git a/switch/build/configure-mesa.sh b/switch/build/configure-mesa.sh
 index bd24665..269342d 100755
 --- a/switch/build/configure-mesa.sh
 +++ b/switch/build/configure-mesa.sh
-@@ -23,9 +23,20 @@ cp -r "$SRC/switch/docker/cross-include/." /opt/switch-cross-include/ 2>/dev/null || true
+@@ -23,9 +23,19 @@ cp -r "$SRC/switch/docker/cross-include/." /opt/switch-cross-include/ 2>/dev/null || true
  RECONF=""
  [ -f "$BUILD/build.ninja" ] && RECONF="--wipe"
 
-+# The build directory may have been removed by a clean build.
-+mkdir -p "$BUILD"
-+
-+# The upstream Rust cross file historically used /work. Generate a build-local
-+# copy with the wrapper resolved from the actual source directory.
-+RUST_CROSS_FILE="$BUILD/rust.cross"
++# The upstream Rust cross file historically used /work. Generate a stable
++# copy with the wrapper resolved from the actual source directory. It must
++# live beside, not below, $BUILD: Meson's --wipe removes the build directory,
++# while Ninja may need the cross file again when regenerating build.ninja.
++RUST_CROSS_FILE="${BUILD}.rust.cross"
 +awk -v rust_wrapper="$SRC/switch/rust/rustc-switch.sh" '
 +  $0 ~ /^rust[[:space:]]*=/ { print "rust    = [" sq rust_wrapper sq "]"; next }
 +  { print }
